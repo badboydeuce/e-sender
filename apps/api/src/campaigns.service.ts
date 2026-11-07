@@ -23,7 +23,7 @@ export class CampaignsService {
    if(await this.prisma.suppression.findUnique({where:{phone}})){results.push({phone,status:"OPTED_OUT"});continue;}
    if(await this.prisma.campaignRecipient.findUnique({where:{campaignId_phone:{campaignId:id,phone}}})){results.push({phone,status:"DUPLICATE"});continue;}
    const recipient=await this.prisma.campaignRecipient.create({data:{campaignId:id,phone,consented:true,consentAt:new Date(),status:"VALIDATING"}});
-   try{const validation=await this.validationKeys.validateNumber(phone);const valid=validation.valid===true&&validation.line_type==="mobile";const status=valid?"ELIGIBLE":"INVALID_NUMBER";await this.prisma.campaignRecipient.update({where:{id:recipient.id},data:{status,validation}});results.push({phone,status,reason:valid?undefined:"Number must be valid and mobile"});}
+   try{const validation=await this.validationKeys.validateNumber(phone);const valid=validation.valid===true&&validation.line_type==="mobile";const status=valid?"ELIGIBLE":"INVALID_NUMBER";await this.prisma.campaignRecipient.update({where:{id:recipient.id},data:{status,validation:JSON.parse(JSON.stringify(validation))}});results.push({phone,status,reason:valid?undefined:"Number must be valid and mobile"});}
    catch(error){const message=error instanceof Error?error.message:"Validation failed";await this.prisma.campaignRecipient.update({where:{id:recipient.id},data:{status:"VALIDATION_ERROR",validation:{error:message}}});results.push({phone,status:"VALIDATION_ERROR",reason:message});}
   }
   return{campaign_id:id,processed:results.length,eligible:results.filter(r=>r.status==="ELIGIBLE").length,results};
