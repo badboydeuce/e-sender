@@ -14,7 +14,7 @@ export class SendingService {
   if(!device||!device.active)throw new BadRequestException("Selected device is not active");
   if(!campaign.devices.some(d=>d.deviceId===deviceId))throw new BadRequestException("Device is not assigned to this campaign");
   const size=Math.min(Math.max(limit??campaign.batchSize,1),campaign.batchSize);
-  const rows=await this.prisma.campaignRecipient.findMany({where:{campaignId,status:"ELIGIBLE",consented:true,phone:{notIn:(await this.prisma.suppression.findMany({select:{phone:true}})).map(s=>s.phone)}},orderBy:{createdAt:"asc"},take:size});
+  const rows=await this.prisma.campaignRecipient.findMany({where:{campaignId,status:"ELIGIBLE",consented:true,batchItems:{none:{status:"QUEUED"}},phone:{notIn:(await this.prisma.suppression.findMany({select:{phone:true}})).map(s=>s.phone)}},orderBy:{createdAt:"asc"},take:size});
   if(!rows.length)throw new BadRequestException("No eligible, opted-in recipients are available for the next batch");
   const messages=campaign.messageSet.split(/\r?\n==\r?\n/).map(v=>v.trim()).filter(Boolean);
   if(!messages.length)throw new BadRequestException("Campaign has no usable message variants");
