@@ -9,8 +9,8 @@ server coordinates devices and campaigns; it does not send SMS itself.
   device heartbeat and admin revocation.
 - **Stage 2:** Next.js dashboard with device health and revocation.
 - **Stage 3:** Campaign creation, E.164 recipient import, documented-consent
-  attestation, sequential validation, suppression/duplicate checks, device
-  assignment and campaign pause/stop.
+  attestation, sequential number validation, suppression/duplicate checks,
+  device assignment and campaign pause/stop.
 - **Stage 3.1:** APILayer key manager at `/api-keys`. Import multiple keys
   one per line, view masked suffixes and request/failure counts, test, enable,
   disable or delete keys. Keys are encrypted at rest using AES-256-GCM and
@@ -22,14 +22,21 @@ server coordinates devices and campaigns; it does not send SMS itself.
 Keys may share subscription limits. Use only keys you are authorized to use
 and follow APILayer plan limits and terms.
 
-
-- **Stage 4.1:** Dashboard-managed global and per-device auto-reply rules, keyword/default matching, STOP suppression, cooldowns, duplicate inbound-message protection and reply audit history. iPhone integration is a later stage; this API does not receive SMS directly from the carrier.
 - **Stage 4:** Explicit batch preview/approval, device-authenticated command
   polling, per-recipient message variant assignment, result reporting, campaign
   reports, and STOP propagation to queued batch items. Admins create a preview
   at `/batches`; only after approval can the assigned iPhone fetch the batch.
+- **Stage 4.1:** Dashboard-managed global and per-device auto-reply rules,
+  keyword/default matching, STOP suppression, cooldowns, duplicate inbound
+  message protection and reply audit history.
+- **Stage 4.2:** An iOS Shortcut integration guide and machine-readable
+  manifest for forwarding incoming Messages to the API, sending a returned
+  reply through the iPhone's SIM/eSIM, and reporting the result. The guide
+  documents how to build the automation in Apple's Shortcuts app; this
+  repository does not generate or install an Apple-signed Shortcut file.
 
 ## Stage 4 device protocol
+
 - `GET /api/device/command` with `x-device-token`: heartbeat plus next
   approved batch assigned to that device.
 - `POST /api/device/batches/:id/report` with `x-device-token`: report each
@@ -49,7 +56,9 @@ iOS. A real delivery receipt is not guaranteed by the iOS send action; report
 error details for failures.
 
 ## Setup
+
 Requirements: Node.js 22+ and PostgreSQL.
+
 1. Run `npm install` at the repository root.
 2. Configure `DATABASE_URL`, `DEVICE_ENROLLMENT_CODE`,
    `DEVICE_TOKEN_SECRET`, `ADMIN_API_TOKEN`, and
@@ -65,40 +74,74 @@ Set the same server-only secrets on Railway API variables. Set
 decrypted. Do not commit it or paste live keys into GitHub.
 
 ## Endpoints
+
 - Campaigns: `/api/admin/campaigns` and nested campaign routes.
 - Public opt-out: `POST /api/recipient/stop`.
 - API keys: `GET|POST /api/admin/validation-keys`,
   `POST /api/admin/validation-keys/import`,
   `POST /api/admin/validation-keys/:id/test`,
   `PATCH|DELETE /api/admin/validation-keys/:id`.
+- Auto-reply administration: `/api/admin/auto-reply`.
+- Incoming auto-reply request: `POST /api/device/incoming-message`.
+- Auto-reply send report: `POST /api/device/auto-reply/:eventId/report`.
+
 Admin endpoints require `Authorization: Bearer <ADMIN_API_TOKEN>`.
 
-**Sending safety:** ELIGIBLE is not a send command. This stage does not send SMS
-from the server and does not implement batch approval, device polling or
-delivery receipts. Only send to recipients with documented consent. iOS
-Shortcuts check in when run; iOS does not guarantee continuous background work.
+## Sending safety and operational limits
+
+- Only import and message recipients with documented consent.
+- Recipient imports require explicit consent confirmation, E.164 format,
+  deduplication, suppression checks and sequential number validation.
+- A recipient is not sent a message merely because validation marks it
+  eligible. Sending requires an administrator-created batch preview and
+  explicit approval before an assigned iPhone can poll the batch.
+- STOP/STOPALL/UNSUBSCRIBE/CANCEL/END/QUIT requests add the number to the
+  suppression list and skip queued items for that recipient.
+- The API coordinates work but does not send SMS. The iPhone Shortcut sends
+  through the device's selected SIM/eSIM.
+- iOS Shortcuts do not guarantee continuous background execution. A stop
+  command cannot retract a message already handed to iOS, and an iOS send
+  action is not proof of carrier delivery.
 
 ## Stage 4.1 auto-reply management
 
 - Dashboard: `/auto-reply`.
-- Global master switch and independent per-iPhone enable/disable settings.
+- Global master switch and independent per-device enable/disable settings.
 - Global rules apply across enabled devices. Device-specific rules override global rules.
 - Matching order: device keyword, global keyword, device default, global default.
 - Leave keyword blank to create a fallback/default reply. Keyword matching is case-insensitive.
 - Cooldown is per sender and matched rule; set to 0 to disable.
 - Incoming STOP/STOPALL/UNSUBSCRIBE/CANCEL/END/QUIT is suppressed and added to the existing global suppression list; queued campaign items for that sender are skipped.
-- `POST /api/device/incoming-message` with `x-device-token` and `{ "message_id", "from", "text" }` asks the server for a reply. A repeated device/message ID is idempotently ignored.
-- `POST /api/device/auto-reply/:eventId/report` with `{ "status": "SENT" | "FAILED", "error"?: "..." }` records the iPhone Shortcut's send-action result.
-- Admin endpoints live under `/api/admin/auto-reply` and require the admin bearer token.
+- `POST /api/device/incoming-message` with `x-device-token` and
+  `{ "message_id", "from", "text" }` asks the server for a reply. A repeated
+  device/message ID is idempotently ignored.
+- `POST /api/device/auto-reply/:eventId/report` with
+  `{ "status": "SENT" | "FAILED", "error"?: "..." }` records the iPhone
+  Shortcut's send-action result.
+- Admin endpoints live under `/api/admin/auto-reply` and require the admin
+  bearer token.
 
-The API does not receive SMS directly from the mobile network and does not send SMS. Stage 4.2 must configure the iOS Message automation to forward incoming-message details to this API and send a returned reply using the iPhone's own SIM/eSIM. iOS automation execution is not guaranteed to be continuously available. A reported `SENT` means the iOS send action succeeded, not that carrier delivery was confirmed.
+The API does not receive SMS directly from the mobile network and does not
+send SMS. The iPhone automation forwards incoming-message details to this API
+and sends a returned reply using the iPhone's own SIM/eSIM. iOS automation
+execution is not guaranteed to be continuously available. A reported `SENT`
+means the iOS send action succeeded, not that carrier delivery was confirmed.
 
 ## Stage 4.2 iPhone auto-reply Shortcut
 
-- Follow [the iOS Shortcut integration guide](docs/ios-auto-reply-shortcut.md) to create a Personal Automation triggered by an incoming Message.
-- The Shortcut forwards the incoming sender (E.164), message text, and a generated UUID to `POST /api/device/incoming-message` using its enrolled device token.
-- It sends only a non-empty reply returned by the API, to the original sender, using the iPhone's own Messages/SIM configuration.
-- It then reports `SENT` or `FAILED` to `POST /api/device/auto-reply/:eventId/report`.
-- A machine-readable integration outline is in `docs/ios-auto-reply-shortcut.manifest.json`.
-- iOS may require user confirmation or limit automation execution. The guide requires testing the actual device/iOS version; the server cannot bypass iOS restrictions.
-- This stage documents and specifies the native Shortcut workflow. It does not generate or install an Apple-signed `.shortcut` file. Build the automation in the Shortcuts app using the guide.
+- Follow [the iOS Shortcut integration guide](docs/ios-auto-reply-shortcut.md)
+  to create a Personal Automation triggered by an incoming Message.
+- The Shortcut forwards the incoming sender (E.164), message text, and a
+  generated UUID to `POST /api/device/incoming-message` using its enrolled
+  device token.
+- It sends only a non-empty reply returned by the API, to the original sender,
+  using the iPhone's own Messages/SIM configuration.
+- It then reports `SENT` or `FAILED` to
+  `POST /api/device/auto-reply/:eventId/report`.
+- A machine-readable integration outline is in
+  `docs/ios-auto-reply-shortcut.manifest.json`.
+- iOS may require user confirmation or limit automation execution. The guide
+  requires testing the actual device/iOS version; the server cannot bypass
+  iOS restrictions.
+- This repository documents the native Shortcut workflow; build the
+  automation in the Shortcuts app using the guide.
