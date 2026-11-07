@@ -69,7 +69,7 @@ export default function Dashboard() {
         </div>
         <div className="sub" style={{marginTop:14}}>{lastUpdated?"Last refreshed "+new Date(lastUpdated).toLocaleTimeString():"Waiting for connection"} · Online means a heartbeat was received within 2 minutes.</div>
       </section>
-      <p className="sub" style={{marginTop:18,lineHeight:1.7}}>Campaign creation, batch approvals, command delivery and delivery reports are planned for the next migration stages. iOS Shortcuts check in when run; iOS does not guarantee continuous background execution.</p>
+      <p className="sub" style={{marginTop:18,lineHeight:1.7}}>Campaigns, batch approvals, device command delivery and reports are available in the dashboard. iOS Shortcuts check in when run; iOS does not guarantee continuous background execution.</p>
     </main>
   </div>;
 }
