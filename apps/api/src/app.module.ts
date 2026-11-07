@@ -7,5 +7,7 @@ import { CampaignsController } from "./campaigns.controller";
 import { CampaignsService } from "./campaigns.service";
 import { ValidationKeysController } from "./validation-keys.controller";
 import { ValidationKeysService } from "./validation-keys.service";
-@Module({controllers:[HealthController,DevicesController,CampaignsController,ValidationKeysController],providers:[PrismaService,DevicesService,CampaignsService,ValidationKeysService]})
+import { SendingController } from "./sending.controller";
+import { SendingService } from "./sending.service";
+@Module({controllers:[HealthController,DevicesController,CampaignsController,ValidationKeysController,SendingController],providers:[PrismaService,DevicesService,CampaignsService,ValidationKeysService,SendingService]})
 export class AppModule {}

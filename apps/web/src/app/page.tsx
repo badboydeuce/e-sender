@@ -35,7 +35,7 @@ export default function Dashboard() {
     <aside className="sidebar">
       <div className="brand"><div className="brand-mark">eS</div><span>eSENDER <span style={{color:"#8b9cff"}}>HQ</span></span></div>
       <div><p className="nav-label">Workspace</p><div className="nav-links">
-        <div className="nav-item active">▦ <span>Overview</span></div><div className="nav-item">▣ <span>Devices</span></div><a className="nav-item" href="/campaigns" style={{textDecoration:"none",color:"inherit"}}>◉ <span>Campaigns</span></a><a className="nav-item" href="/api-keys" style={{textDecoration:"none",color:"inherit"}}>⚿ <span>API keys</span></a><div className="nav-item">▤ <span>Reports</span></div>
+        <div className="nav-item active">▦ <span>Overview</span></div><div className="nav-item">▣ <span>Devices</span></div><a className="nav-item" href="/campaigns" style={{textDecoration:"none",color:"inherit"}}>◉ <span>Campaigns</span></a><a className="nav-item" href="/batches" style={{textDecoration:"none",color:"inherit"}}>▣ <span>Batch approvals</span></a><a className="nav-item" href="/api-keys" style={{textDecoration:"none",color:"inherit"}}>⚿ <span>API keys</span></a><div className="nav-item">▤ <span>Reports</span></div>
       </div></div>
       <div className="sidebar-foot">MULTI-IPHONE CONTROL CENTER<br/>Messages are sent by enrolled iPhones using their own SIM/eSIM.</div>
     </aside>

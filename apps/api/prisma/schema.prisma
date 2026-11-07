@@ -17,6 +17,7 @@ model Device {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   assignments CampaignDevice[]
+  batches CampaignBatch[]
   @@index([active, lastSeenAt])
 }
 model Campaign {
@@ -29,6 +30,7 @@ model Campaign {
   updatedAt DateTime @updatedAt
   recipients CampaignRecipient[]
   devices CampaignDevice[]
+  batches CampaignBatch[]
   @@index([status, createdAt])
 }
 model CampaignRecipient {
@@ -42,6 +44,7 @@ model CampaignRecipient {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  batchItems BatchRecipient[]
   @@unique([campaignId, phone])
   @@index([campaignId, status])
   @@index([phone])
@@ -81,4 +84,38 @@ model ValidationApiKey {
 model ValidationKeyRotation {
   id String @id @default("global")
   sequence BigInt @default(0)
+}
+
+model CampaignBatch {
+  id String @id @default(cuid())
+  campaignId String
+  deviceId String
+  status String @default("PENDING_APPROVAL")
+  approvedAt DateTime?
+  startedAt DateTime?
+  completedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  recipients BatchRecipient[]
+  @@index([deviceId, status, createdAt])
+  @@index([campaignId, status])
+}
+model BatchRecipient {
+  id String @id @default(cuid())
+  batchId String
+  recipientId String
+  message String
+  status String @default("QUEUED")
+  attemptedAt DateTime?
+  sentAt DateTime?
+  error String?
+  providerMessageId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  batch CampaignBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  recipient CampaignRecipient @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  @@unique([batchId, recipientId])
+  @@index([batchId, status])
 }
