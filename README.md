@@ -1,47 +1,74 @@
 # eSIM Sender Multi-iPhone Admin Panel
 
-A modular FastAPI starter for managing enrolled iPhones, campaigns, device commands,
-and delivery reports. iPhones perform sending locally through their own SIM/eSIM
-using an explicitly configured iOS Shortcut. The server does not send SMS itself.
+A central admin system for coordinating enrolled iPhones. Each iPhone runs an
+iOS Shortcut and sends permitted messages through its own installed SIM/eSIM.
+The server coordinates devices and campaigns; it does not send SMS itself.
 
-## Architecture
+## TypeScript migration
 
-- `app/api/`: HTTP routes grouped by feature
-- `app/core/`: settings, authentication helpers, logging
-- `app/db/`: SQLAlchemy engine and session management
-- `app/models/`: database models
-- `app/schemas/`: request/response validation
-- `app/services/`: business logic
-- `app/web/`: dashboard static assets and templates
-- `tests/`: automated tests
+The migration is being delivered in stages. The existing Python/FastAPI starter
+is intentionally retained during the transition so the working baseline is not
+deleted before the TypeScript replacement reaches feature parity.
 
-## Local setup (development)
+### Stage 1 — TypeScript API foundation
 
-1. Create a virtual environment: `py -m venv .venv`
-2. Activate it: `.venv\Scripts\activate`
-3. Install dependencies: `pip install -r requirements.txt`
-4. Copy `.env.example` to `.env` and set strong, unique secrets.
-5. Start: `uvicorn app.main:app --reload`
-6. Open `http://127.0.0.1:8000`
+- Node.js + TypeScript + NestJS API in `apps/api`
+- PostgreSQL persistence through Prisma
+- Health endpoint at `GET /api/health`
+- Protected iPhone enrollment using a shared enrollment code
+- Unique high-entropy device token returned once at enrollment
+- HMAC-SHA256 token digests stored in the database, never raw device tokens
+- Authenticated heartbeat with last-seen timestamp
+- Admin-protected device revocation
+- Strict request DTO validation
 
-The included database setup creates tables on startup for development. For production,
-use Alembic migrations, PostgreSQL, HTTPS, a managed secret store, backups, rate limits,
-audit logging, and an authenticated admin account with MFA.
+### Local setup
 
-## Device protocol
+Requirements: Node.js 22+ and PostgreSQL.
 
-A device enrolls once, stores its device token securely, then periodically:
-- sends a heartbeat;
-- fetches its assigned configuration and pending commands;
-- reports each permitted action/result.
+1. Run `npm install` at the repository root.
+2. Copy `.env.example` to `.env` and set three independent random secrets
+   (each at least 32 characters).
+3. Set `DATABASE_URL` to your PostgreSQL connection string.
+4. Run `npm run build`.
+5. Run `npm run db:push --workspace @esender/api`.
+6. Run `npm run dev`.
 
-The iOS Shortcut must check campaign state at safe checkpoints. Pause/stop cannot
-cancel a message already handed to iOS. iOS does not guarantee always-on background
-execution, so the device checks in when the Shortcut runs.
+The API listens on port 3000 by default.
 
-## Consent and safety
+### API endpoints
 
-Use only recipient lists with documented permission. Keep opt-out exclusions active,
-honor STOP requests, avoid duplicate sends, and apply per-device and per-campaign
-rate limits. This starter deliberately does not implement message blasting or bypass
-platform/carrier restrictions.
+- `GET /api/health`
+- `POST /api/device/enroll` — body: `enrollment_code`, `name`, `platform: "iOS"`
+- `POST /api/device/heartbeat` — header: `X-Device-Token`
+- `POST /api/device/:deviceId/revoke` — header: `Authorization: Bearer <ADMIN_API_TOKEN>`
+
+The raw device token is returned only once. Store it securely on its iPhone.
+Never put the server-side enrollment code, token HMAC secret, or admin token in
+an iOS Shortcut. Existing devices must enroll again when switching to the new
+TypeScript token store.
+
+### Railway deployment
+
+The repository includes `railway.toml`. Create a Railway project from branch
+`typescript/migration-foundation`, add a PostgreSQL service, and set
+`DATABASE_URL`, `DEVICE_ENROLLMENT_CODE`, `DEVICE_TOKEN_SECRET`,
+`ADMIN_API_TOKEN`, and `APP_ENV=production` in the API service variables.
+Railway's database reference should point to the PostgreSQL service's
+`DATABASE_URL`. The current bootstrap uses Prisma `db push` for this early
+stage; before production rollout, replace it with reviewed Prisma migrations.
+
+### Preserved product requirements
+
+- Selected group/campaign sending coordinated across multiple iPhones.
+- Each iPhone sends through its own SIM/eSIM using iOS Shortcuts.
+- Batch sending with confirmation before each batch.
+- Per-number validation followed immediately by sending when valid.
+- Duplicate removal and opt-out exclusions, including STOP handling.
+- Message variants from `Message.txt`, separated by `==`, with rotation.
+- Leads from `Leads.txt` or manual paste, in international format.
+- Per-device heartbeat, command polling, campaign assignment and reports.
+- Only message recipients with documented consent.
+
+iOS does not guarantee always-on background execution. Devices check in when
+their Shortcut runs; a stop command cannot cancel a message already handed to iOS.
