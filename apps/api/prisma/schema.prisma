@@ -8,57 +8,77 @@ datasource db {
 }
 
 model Device {
-  id           String    @id @default(cuid())
-  name         String
-  platform     String    @default("iOS")
-  tokenHash    String    @unique
-  active       Boolean   @default(true)
-  lastSeenAt   DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  assignments  CampaignDevice[]
+  id String @id @default(cuid())
+  name String
+  platform String @default("iOS")
+  tokenHash String @unique
+  active Boolean @default(true)
+  lastSeenAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  assignments CampaignDevice[]
   @@index([active, lastSeenAt])
 }
-
 model Campaign {
-  id          String   @id @default(cuid())
-  name        String
-  messageSet  String
-  status      String   @default("DRAFT")
-  batchSize   Int      @default(20)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  recipients  CampaignRecipient[]
-  devices     CampaignDevice[]
+  id String @id @default(cuid())
+  name String
+  messageSet String
+  status String @default("DRAFT")
+  batchSize Int @default(20)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  recipients CampaignRecipient[]
+  devices CampaignDevice[]
   @@index([status, createdAt])
 }
-
 model CampaignRecipient {
-  id          String   @id @default(cuid())
-  campaignId  String
-  phone       String
-  consented   Boolean  @default(false)
-  consentAt   DateTime?
-  status      String   @default("PENDING")
-  validation  Json?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  id String @id @default(cuid())
+  campaignId String
+  phone String
+  consented Boolean @default(false)
+  consentAt DateTime?
+  status String @default("PENDING")
+  validation Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   @@unique([campaignId, phone])
   @@index([campaignId, status])
   @@index([phone])
 }
-
 model Suppression {
-  phone      String   @id
-  reason     String   @default("STOP")
-  createdAt  DateTime @default(now())
+  phone String @id
+  reason String @default("STOP")
+  createdAt DateTime @default(now())
 }
 model CampaignDevice {
   campaignId String
-  deviceId   String
-  createdAt  DateTime @default(now())
-  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  device     Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  deviceId String
+  createdAt DateTime @default(now())
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
   @@id([campaignId, deviceId])
+}
+model ValidationApiKey {
+  id String @id @default(cuid())
+  label String
+  encryptedKey String
+  iv String
+  authTag String
+  fingerprint String @unique
+  lastFour String
+  enabled Boolean @default(true)
+  status String @default("READY")
+  requestCount Int @default(0)
+  failureCount Int @default(0)
+  lastUsedAt DateTime?
+  lastError String?
+  cooldownUntil DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([enabled, cooldownUntil, createdAt])
+}
+model ValidationKeyRotation {
+  id String @id @default("global")
+  sequence BigInt @default(0)
 }

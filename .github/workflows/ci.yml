@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+      - typescript/migration-foundation
+      - typescript/admin-dashboard
+      - typescript/campaign-recipient-management
+  push:
+    branches:
+      - main
+      - "typescript/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Typecheck and build (Node.js 22)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/esender_ci
+      DEVICE_ENROLLMENT_CODE: ci-only-enrollment-secret-not-for-production
+      DEVICE_TOKEN_SECRET: ci-only-device-token-secret-not-for-production
+      ADMIN_API_TOKEN: ci-only-admin-token-not-for-production
+      API_KEY_ENCRYPTION_SECRET: ci-only-encryption-secret-not-for-production-32chars
+      ESENDER_API_URL: http://localhost:3000
+      CORS_ORIGIN: http://localhost:3001
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Generate Prisma Client
+        run: npx prisma generate --schema apps/api/prisma/schema.prisma
+
+      - name: Type-check API and dashboard
+        run: npm run typecheck
+
+      - name: Build API and dashboard
+        run: npm run build
