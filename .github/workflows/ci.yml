@@ -25,6 +25,20 @@ jobs:
     name: Typecheck and build (Node.js 22)
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: esender_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d esender_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/esender_ci
       DEVICE_ENROLLMENT_CODE: ci-only-enrollment-secret-not-for-production
@@ -44,6 +58,8 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Generate Prisma Client
         run: npx prisma generate --schema apps/api/prisma/schema.prisma
+      - name: Apply Prisma migrations to a clean PostgreSQL database
+        run: npx prisma migrate deploy --schema apps/api/prisma/schema.prisma
       - name: Type-check API and dashboard
         run: npm run typecheck
       - name: Build API and dashboard
