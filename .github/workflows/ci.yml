@@ -17,7 +17,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-\${{ github.workflow }}-\${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -36,20 +36,17 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
-
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-
       - name: Generate Prisma Client
         run: npx prisma generate --schema apps/api/prisma/schema.prisma
-
       - name: Type-check API and dashboard
         run: npm run typecheck
-
       - name: Build API and dashboard
         run: npm run build
+      - name: Run unit tests
+        run: npm test
