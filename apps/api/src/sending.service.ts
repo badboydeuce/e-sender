@@ -8,9 +8,8 @@ type ReportItem={item_id:string;status:"SENT"|"FAILED"|"SKIPPED";error?:string;p
 export class SendingService {
  constructor(private readonly prisma:PrismaService,private readonly devices:DevicesService){}
  async previewBatch(campaignId:string,deviceId:string,limit?:number){
-  // Lock the campaign row to serialize previews and prevent duplicate recipient reservations.
   return this.prisma.$transaction(async tx=>{
-   await tx.$queryRaw<Array<{id:string}>>\`SELECT "id" FROM "Campaign" WHERE "id" = \${campaignId} FOR UPDATE\`;
+   await tx.$queryRawUnsafe<Array<{id:string}>>('SELECT "id" FROM "Campaign" WHERE "id" = $1 FOR UPDATE',campaignId);
    const campaign=await tx.campaign.findUnique({where:{id:campaignId},include:{devices:true}});
    if(!campaign)throw new NotFoundException("Campaign not found");
    if(["STOPPED","PAUSED"].includes(campaign.status))throw new BadRequestException("Campaign is paused or stopped");
@@ -32,8 +31,8 @@ export class SendingService {
   return this.prisma.$transaction(async tx=>{
    const initial=await tx.campaignBatch.findUnique({where:{id},select:{campaignId:true}});
    if(!initial)throw new NotFoundException("Batch not found");
-   await tx.$queryRaw<Array<{id:string}>>\`SELECT "id" FROM "Campaign" WHERE "id" = \${initial.campaignId} FOR UPDATE\`;
-   await tx.$queryRaw<Array<{id:string}>>\`SELECT "id" FROM "CampaignBatch" WHERE "id" = \${id} FOR UPDATE\`;
+   await tx.$queryRawUnsafe<Array<{id:string}>>('SELECT "id" FROM "Campaign" WHERE "id" = $1 FOR UPDATE',initial.campaignId);
+   await tx.$queryRawUnsafe<Array<{id:string}>>('SELECT "id" FROM "CampaignBatch" WHERE "id" = $1 FOR UPDATE',id);
    const batch=await tx.campaignBatch.findUnique({where:{id},include:{campaign:true,device:true}});
    if(!batch)throw new NotFoundException("Batch not found");
    if(batch.status!=="PENDING_APPROVAL")throw new BadRequestException("Only a pending batch can be approved");
@@ -64,7 +63,6 @@ export class SendingService {
   const batch=await this.prisma.campaignBatch.findUnique({where:{id:batchId},include:{campaign:true}});
   if(!batch||batch.deviceId!==device.id)throw new NotFoundException("Batch not found for this device");
   if(batch.status!=="IN_PROGRESS")throw new BadRequestException("Batch is not in progress");
-  // Reports from work already handed to iOS remain valid after an admin pauses/stops future work.
   const ids=[...new Set(items.map(i=>i.item_id))];
   const known=await this.prisma.batchRecipient.findMany({where:{id:{in:ids},batchId},include:{recipient:true}});
   if(known.length!==ids.length)throw new BadRequestException("Report contains an item not belonging to this batch");
