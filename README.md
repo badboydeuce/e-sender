@@ -22,6 +22,31 @@ server coordinates devices and campaigns; it does not send SMS itself.
 Keys may share subscription limits. Use only keys you are authorized to use
 and follow APILayer plan limits and terms.
 
+
+- **Stage 4:** Explicit batch preview/approval, device-authenticated command
+  polling, per-recipient message variant assignment, result reporting, campaign
+  reports, and STOP propagation to queued batch items. Admins create a preview
+  at `/batches`; only after approval can the assigned iPhone fetch the batch.
+
+## Stage 4 device protocol
+- `GET /api/device/command` with `x-device-token`: heartbeat plus next
+  approved batch assigned to that device.
+- `POST /api/device/batches/:id/report` with `x-device-token`: report each
+  item as `SENT`, `FAILED`, or `SKIPPED`.
+- Admin batch preview: `POST /api/admin/batches/preview` with
+  `campaign_id` and `device_id`.
+- Admin approval: `POST /api/admin/batches/:id/approve`.
+- Admin cancellation: `POST /api/admin/batches/:id/cancel`.
+- Campaign report: `GET /api/admin/campaigns/:id/report`.
+
+The iPhone Shortcut must poll using its device token, show/send only the
+returned approved items, and report each result. The API does not send SMS.
+A batch already fetched by a Shortcut cannot be recalled from the phone; pause
+or stop prevents future polls, but cannot retract a message already handed to
+iOS. A real delivery receipt is not guaranteed by the iOS send action; report
+`SENT` only when the Shortcut's send action succeeds, and retain any available
+error details for failures.
+
 ## Setup
 Requirements: Node.js 22+ and PostgreSQL.
 1. Run `npm install` at the repository root.
