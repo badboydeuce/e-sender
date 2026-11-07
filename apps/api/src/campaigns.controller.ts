@@ -50,7 +50,7 @@ export class CampaignsController {
   }
 
   @Post("admin/campaigns/:id/recipients/import")
-  import(@Headers("authorization") auth: string | undefined, @Param("id") id: string, @Body() body: ImportRecipientsDto) {
+  importRecipients(@Headers("authorization") auth: string | undefined, @Param("id") id: string, @Body() body: ImportRecipientsDto) {
     this.admin(auth); return this.campaigns.importRecipients(id, body.phones, body.consent_confirmed);
   }
 
