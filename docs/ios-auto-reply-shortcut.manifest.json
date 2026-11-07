@@ -1,0 +1,36 @@
+{
+  "stage": "4.2",
+  "name": "eSender Incoming Auto Reply",
+  "platform": "iOS Shortcuts Personal Automation",
+  "trigger": "Message received",
+  "server_sends_sms": false,
+  "device_sends_sms": true,
+  "required_headers": {
+    "Content-Type": "application/json",
+    "x-device-token": "<PRIVATE_ENROLLED_DEVICE_TOKEN>"
+  },
+  "request": {
+    "method": "POST",
+    "path": "/api/device/incoming-message",
+    "body": {
+      "message_id": "<UUID_GENERATED_ONCE_PER_INCOMING_MESSAGE>",
+      "from": "<SENDER_PHONE_E164>",
+      "text": "<INCOMING_MESSAGE_TEXT>"
+    }
+  },
+  "response_fields": ["event_id", "reply", "status"],
+  "send_condition": "reply is a non-empty string AND event_id is present",
+  "send_action": "iOS Shortcuts Send Message to original sender using the iPhone's selected Messages line",
+  "report": {
+    "method": "POST",
+    "path": "/api/device/auto-reply/{event_id}/report",
+    "body_success": {"status": "SENT"},
+    "body_failure": {"status": "FAILED", "error": "<SHORTCUT_ERROR_TEXT>"}
+  },
+  "notes": [
+    "Reuse the same message_id when retrying the same incoming event.",
+    "Do not send when reply is null or empty.",
+    "SENT means the iOS send action completed, not carrier delivery confirmation.",
+    "iOS automation execution and silent sending depend on OS version and user settings."
+  ]
+}
