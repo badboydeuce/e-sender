@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Headers, HttpCode, Param, Patch, Post, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Headers, HttpCode, Param, Patch, Post, Query, UnauthorizedException } from "@nestjs/common";
 import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength } from "class-validator";
 import { DevicesService } from "./devices.service";
 import { AutoReplyService } from "./auto-reply.service";
@@ -35,6 +35,6 @@ export class AutoReplyController {
   @Patch("admin/auto-reply/rules/:id") update(@Headers("authorization") auth:string|undefined,@Param("id") id:string,@Body() body:Partial<RuleDto>){this.admin(auth);return this.auto.updateRule(id,body);}
   @Delete("admin/auto-reply/rules/:id") remove(@Headers("authorization") auth:string|undefined,@Param("id") id:string){this.admin(auth);return this.auto.deleteRule(id);}
   @Get("admin/auto-reply/history") history(@Headers("authorization") auth:string|undefined,@Query("limit") limit?:string){this.admin(auth);return this.auto.history(Number(limit)||100);}
-  @Post("device/incoming-message") @HttpCode(200) incoming(@Headers("x-device-token") token:string|undefined,@Body() body:IncomingDto){if(!token)throw new Error("Device token required");return this.auto.receive(token,body);}
-  @Post("device/auto-reply/:eventId/report") @HttpCode(200) report(@Headers("x-device-token") token:string|undefined,@Param("eventId") id:string,@Body() body:SendReportDto){if(!token)throw new Error("Device token required");return this.auto.report(token,id,body.status,body.error);}
+  @Post("device/incoming-message") @HttpCode(200) incoming(@Headers("x-device-token") token:string|undefined,@Body() body:IncomingDto){if(!token)throw new UnauthorizedException("Device token required");return this.auto.receive(token,body);}
+  @Post("device/auto-reply/:eventId/report") @HttpCode(200) report(@Headers("x-device-token") token:string|undefined,@Param("eventId") id:string,@Body() body:SendReportDto){if(!token)throw new UnauthorizedException("Device token required");return this.auto.report(token,id,body.status,body.error);}
 }
