@@ -60,6 +60,8 @@ jobs:
         run: npx prisma generate --schema apps/api/prisma/schema.prisma
       - name: Apply Prisma migrations to a clean PostgreSQL database
         run: npx prisma migrate deploy --schema apps/api/prisma/schema.prisma
+      - name: Verify database schema matches Prisma models
+        run: npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel apps/api/prisma/schema.prisma --exit-code
       - name: Type-check API and dashboard
         run: npm run typecheck
       - name: Build API and dashboard
