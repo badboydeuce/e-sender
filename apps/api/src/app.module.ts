@@ -9,5 +9,7 @@ import { ValidationKeysController } from "./validation-keys.controller";
 import { ValidationKeysService } from "./validation-keys.service";
 import { SendingController } from "./sending.controller";
 import { SendingService } from "./sending.service";
-@Module({controllers:[HealthController,DevicesController,CampaignsController,ValidationKeysController,SendingController],providers:[PrismaService,DevicesService,CampaignsService,ValidationKeysService,SendingService]})
+import { AutoReplyController } from "./auto-reply.controller";
+import { AutoReplyService } from "./auto-reply.service";
+@Module({controllers:[HealthController,DevicesController,CampaignsController,ValidationKeysController,SendingController,AutoReplyController],providers:[PrismaService,DevicesService,CampaignsService,ValidationKeysService,SendingService,AutoReplyService]})
 export class AppModule {}
