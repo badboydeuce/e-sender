@@ -23,6 +23,7 @@ Keys may share subscription limits. Use only keys you are authorized to use
 and follow APILayer plan limits and terms.
 
 
+- **Stage 4.1:** Dashboard-managed global and per-device auto-reply rules, keyword/default matching, STOP suppression, cooldowns, duplicate inbound-message protection and reply audit history. iPhone integration is a later stage; this API does not receive SMS directly from the carrier.
 - **Stage 4:** Explicit batch preview/approval, device-authenticated command
   polling, per-recipient message variant assignment, result reporting, campaign
   reports, and STOP propagation to queued batch items. Admins create a preview
@@ -76,3 +77,18 @@ Admin endpoints require `Authorization: Bearer <ADMIN_API_TOKEN>`.
 from the server and does not implement batch approval, device polling or
 delivery receipts. Only send to recipients with documented consent. iOS
 Shortcuts check in when run; iOS does not guarantee continuous background work.
+
+## Stage 4.1 auto-reply management
+
+- Dashboard: `/auto-reply`.
+- Global master switch and independent per-iPhone enable/disable settings.
+- Global rules apply across enabled devices. Device-specific rules override global rules.
+- Matching order: device keyword, global keyword, device default, global default.
+- Leave keyword blank to create a fallback/default reply. Keyword matching is case-insensitive.
+- Cooldown is per sender and matched rule; set to 0 to disable.
+- Incoming STOP/STOPALL/UNSUBSCRIBE/CANCEL/END/QUIT is suppressed and added to the existing global suppression list; queued campaign items for that sender are skipped.
+- `POST /api/device/incoming-message` with `x-device-token` and `{ "message_id", "from", "text" }` asks the server for a reply. A repeated device/message ID is idempotently ignored.
+- `POST /api/device/auto-reply/:eventId/report` with `{ "status": "SENT" | "FAILED", "error"?: "..." }` records the iPhone Shortcut's send-action result.
+- Admin endpoints live under `/api/admin/auto-reply` and require the admin bearer token.
+
+The API does not receive SMS directly from the mobile network and does not send SMS. Stage 4.2 must configure the iOS Message automation to forward incoming-message details to this API and send a returned reply using the iPhone's own SIM/eSIM. iOS automation execution is not guaranteed to be continuously available. A reported `SENT` means the iOS send action succeeded, not that carrier delivery was confirmed.
