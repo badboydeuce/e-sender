@@ -18,6 +18,9 @@ model Device {
   updatedAt DateTime @updatedAt
   assignments CampaignDevice[]
   batches CampaignBatch[]
+  autoReplySettings DeviceAutoReplySettings?
+  autoReplyRules AutoReplyRule[]
+  autoReplyEvents AutoReplyEvent[]
   @@index([active, lastSeenAt])
 }
 model Campaign {
@@ -85,7 +88,6 @@ model ValidationKeyRotation {
   id String @id @default("global")
   sequence BigInt @default(0)
 }
-
 model CampaignBatch {
   id String @id @default(cuid())
   campaignId String
@@ -118,4 +120,51 @@ model BatchRecipient {
   recipient CampaignRecipient @relation(fields: [recipientId], references: [id], onDelete: Cascade)
   @@unique([batchId, recipientId])
   @@index([batchId, status])
+}
+model AutoReplySettings {
+  id String @id @default("global")
+  enabled Boolean @default(false)
+  updatedAt DateTime @updatedAt
+}
+model DeviceAutoReplySettings {
+  id String @id @default(cuid())
+  deviceId String @unique
+  enabled Boolean @default(true)
+  updatedAt DateTime @updatedAt
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+}
+model AutoReplyRule {
+  id String @id @default(cuid())
+  scope String @default("GLOBAL")
+  deviceId String?
+  name String
+  keyword String?
+  message String
+  enabled Boolean @default(true)
+  cooldownMinutes Int @default(1440)
+  priority Int @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  device Device? @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  events AutoReplyEvent[]
+  @@index([scope, deviceId, enabled, priority])
+}
+model AutoReplyEvent {
+  id String @id @default(cuid())
+  deviceId String
+  externalMessageId String
+  phone String
+  incomingText String
+  replyText String?
+  status String @default("RECEIVED")
+  ruleId String?
+  error String?
+  createdAt DateTime @default(now())
+  reportedAt DateTime?
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  rule AutoReplyRule? @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+  @@unique([deviceId, externalMessageId])
+  @@index([phone, createdAt])
+  @@index([deviceId, createdAt])
+  @@index([status, createdAt])
 }
