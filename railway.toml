@@ -3,7 +3,7 @@ builder = "NIXPACKS"
 buildCommand = "npm install && npm run build --workspace @esender/api"
 
 [deploy]
-startCommand = "npm run db:push --workspace @esender/api && npm run start:prod --workspace @esender/api"
+startCommand = "npm run db:migrate --workspace @esender/api && npm run start:prod --workspace @esender/api"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 120
 restartPolicyType = "ON_FAILURE"

@@ -8,14 +8,163 @@ datasource db {
 }
 
 model Device {
-  id           String    @id @default(cuid())
-  name         String
-  platform     String    @default("iOS")
-  tokenHash    String    @unique
-  active       Boolean   @default(true)
-  lastSeenAt   DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-
+  id String @id @default(cuid())
+  name String
+  platform String @default("iOS")
+  tokenHash String @unique
+  active Boolean @default(true)
+  lastSeenAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  assignments CampaignDevice[]
+  batches CampaignBatch[]
+  autoReplySettings DeviceAutoReplySettings?
+  autoReplyRules AutoReplyRule[]
+  autoReplyEvents AutoReplyEvent[]
   @@index([active, lastSeenAt])
+}
+model Campaign {
+  id String @id @default(cuid())
+  name String
+  messageSet String
+  status String @default("DRAFT")
+  batchSize Int @default(20)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  recipients CampaignRecipient[]
+  devices CampaignDevice[]
+  batches CampaignBatch[]
+  @@index([status, createdAt])
+}
+model CampaignRecipient {
+  id String @id @default(cuid())
+  campaignId String
+  phone String
+  consented Boolean @default(false)
+  consentAt DateTime?
+  status String @default("PENDING")
+  validation Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  batchItems BatchRecipient[]
+  @@unique([campaignId, phone])
+  @@index([campaignId, status])
+  @@index([phone])
+}
+model Suppression {
+  phone String @id
+  reason String @default("STOP")
+  createdAt DateTime @default(now())
+}
+model CampaignDevice {
+  campaignId String
+  deviceId String
+  createdAt DateTime @default(now())
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  @@id([campaignId, deviceId])
+}
+model ValidationApiKey {
+  id String @id @default(cuid())
+  label String
+  encryptedKey String
+  iv String
+  authTag String
+  fingerprint String @unique
+  lastFour String
+  enabled Boolean @default(true)
+  status String @default("READY")
+  requestCount Int @default(0)
+  failureCount Int @default(0)
+  lastUsedAt DateTime?
+  lastError String?
+  cooldownUntil DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([enabled, cooldownUntil, createdAt])
+}
+model ValidationKeyRotation {
+  id String @id @default("global")
+  sequence BigInt @default(0)
+}
+model CampaignBatch {
+  id String @id @default(cuid())
+  campaignId String
+  deviceId String
+  status String @default("PENDING_APPROVAL")
+  approvedAt DateTime?
+  startedAt DateTime?
+  completedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  recipients BatchRecipient[]
+  @@index([deviceId, status, createdAt])
+  @@index([campaignId, status])
+}
+model BatchRecipient {
+  id String @id @default(cuid())
+  batchId String
+  recipientId String
+  message String
+  status String @default("QUEUED")
+  attemptedAt DateTime?
+  sentAt DateTime?
+  error String?
+  providerMessageId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  batch CampaignBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  recipient CampaignRecipient @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  @@unique([batchId, recipientId])
+  @@index([batchId, status])
+}
+model AutoReplySettings {
+  id String @id @default("global")
+  enabled Boolean @default(false)
+  updatedAt DateTime @updatedAt
+}
+model DeviceAutoReplySettings {
+  id String @id @default(cuid())
+  deviceId String @unique
+  enabled Boolean @default(true)
+  updatedAt DateTime @updatedAt
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+}
+model AutoReplyRule {
+  id String @id @default(cuid())
+  scope String @default("GLOBAL")
+  deviceId String?
+  name String
+  keyword String?
+  message String
+  enabled Boolean @default(true)
+  cooldownMinutes Int @default(1440)
+  priority Int @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  device Device? @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  events AutoReplyEvent[]
+  @@index([scope, deviceId, enabled, priority])
+}
+model AutoReplyEvent {
+  id String @id @default(cuid())
+  deviceId String
+  externalMessageId String
+  phone String
+  incomingText String
+  replyText String?
+  status String @default("RECEIVED")
+  ruleId String?
+  error String?
+  createdAt DateTime @default(now())
+  reportedAt DateTime?
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  rule AutoReplyRule? @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+  @@unique([deviceId, externalMessageId])
+  @@index([phone, createdAt])
+  @@index([deviceId, createdAt])
+  @@index([status, createdAt])
 }
