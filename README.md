@@ -6,9 +6,8 @@ The server coordinates devices and campaigns; it does not send SMS itself.
 
 ## TypeScript migration
 
-The migration is being delivered in stages. The existing Python/FastAPI starter
-is intentionally retained during the transition so the working baseline is not
-deleted before the TypeScript replacement reaches feature parity.
+The migration is delivered in stages. The existing Python/FastAPI starter is
+intentionally retained until the TypeScript replacement reaches feature parity.
 
 ### Stage 1 — TypeScript API foundation
 
@@ -16,79 +15,95 @@ deleted before the TypeScript replacement reaches feature parity.
 - PostgreSQL persistence through Prisma
 - Health endpoint at `GET /api/health`
 - Protected iPhone enrollment using a shared enrollment code
-- Unique high-entropy device token returned once at enrollment
-- HMAC-SHA256 token digests stored in the database, never raw device tokens
-- Authenticated heartbeat with last-seen timestamp
-- Admin-protected device revocation
+- High-entropy device token returned once; HMAC-SHA256 digest stored
+- Authenticated heartbeat and admin-protected device revocation
 - Strict request DTO validation
+
+### Stage 2 — Admin dashboard and device management
+
+A responsive Next.js + TypeScript dashboard lives in `apps/web`. It provides
+admin-token authentication, device counts, heartbeat status, automatic refresh,
+and device revocation. Server-side route handlers proxy requests to the API.
+
+### Stage 3 — Campaigns and consent-aware recipient management
+
+- Create campaigns with message variants and configurable batch size.
+- Import recipient numbers by paste or text-list input in E.164 format.
+- Require explicit operator confirmation that every imported recipient opted in.
+- Process numbers sequentially: format check, global suppression check, duplicate
+  check, then APILayer Number Verification. Each passing mobile number becomes
+  `ELIGIBLE` immediately; the entire list is not held for a separate validation
+  queue.
+- Reject invalid format, duplicate, suppressed, invalid/non-mobile and provider-error
+  records with separate statuses.
+- Assign only active enrolled devices to a campaign through the admin API.
+- Pause or stop a campaign.
+- Public `POST /api/recipient/stop` endpoint adds a number to the global suppression
+  list and marks its existing campaign records opted out.
+
+**Important:** eligible means the number passed the provider's validity/mobile
+check; it is not a send command. This stage does not yet implement batch approval,
+device command polling, or delivery receipts. Those are the next stage. No SMS
+is sent by the server. Sending remains on the iPhone Shortcut, which must check
+campaign state and opt-out status before each batch and confirm with the operator.
 
 ### Local setup
 
 Requirements: Node.js 22+ and PostgreSQL.
 
 1. Run `npm install` at the repository root.
-2. Copy `.env.example` to `.env` and set three independent random secrets
-   (each at least 32 characters).
-3. Set `DATABASE_URL` to your PostgreSQL connection string.
-4. Run `npm run build`.
-5. Run `npm run db:push --workspace @esender/api`.
-6. Run `npm run dev`.
+2. Set `DATABASE_URL`, `DEVICE_ENROLLMENT_CODE`, `DEVICE_TOKEN_SECRET`,
+   and `ADMIN_API_TOKEN` on the API service. Use independent random secrets
+   (at least 32 characters).
+3. Set `APILAYER_API_KEY` on the API service. Never expose it in the browser,
+   Shortcut, or Git.
+4. Run `npm run db:push --workspace @esender/api` to apply the Prisma schema.
+5. Run `npm run build` and `npm run typecheck`.
+6. Start the API with `npm run dev`; start the web app with
+   `npm run dev --workspace @esender/web`.
 
-The API listens on port 3000 by default.
+The API listens on port 3000 and the dashboard on port 3001 by default.
 
 ### API endpoints
 
 - `GET /api/health`
-- `POST /api/device/enroll` — body: `enrollment_code`, `name`, `platform: "iOS"`
-- `POST /api/device/heartbeat` — header: `X-Device-Token`
-- `POST /api/device/:deviceId/revoke` — header: `Authorization: Bearer <ADMIN_API_TOKEN>`
+- `POST /api/device/enroll`
+- `POST /api/device/heartbeat`
+- `GET /api/admin/devices`
+- `POST /api/admin/devices/:deviceId/revoke`
+- `GET|POST /api/admin/campaigns`
+- `GET /api/admin/campaigns/:id`
+- `PATCH /api/admin/campaigns/:id/status`
+- `POST /api/admin/campaigns/:id/devices`
+- `GET /api/admin/campaigns/:id/recipients`
+- `POST /api/admin/campaigns/:id/recipients/import`
+- `POST /api/recipient/stop` (public opt-out endpoint)
 
-The raw device token is returned only once. Store it securely on its iPhone.
-Never put the server-side enrollment code, token HMAC secret, or admin token in
-an iOS Shortcut. Existing devices must enroll again when switching to the new
-TypeScript token store.
+Admin endpoints require `Authorization: Bearer <ADMIN_API_TOKEN>`.
+The raw device token is returned only once. Never put server-side enrollment,
+admin or validation secrets in an iOS Shortcut.
 
 ### Railway deployment
 
-The repository includes `railway.toml`. Create a Railway project from branch
-`typescript/migration-foundation`, add a PostgreSQL service, and set
+Deploy the API from the repository root with PostgreSQL attached. Set
 `DATABASE_URL`, `DEVICE_ENROLLMENT_CODE`, `DEVICE_TOKEN_SECRET`,
-`ADMIN_API_TOKEN`, and `APP_ENV=production` in the API service variables.
-Railway's database reference should point to the PostgreSQL service's
-`DATABASE_URL`. The current bootstrap uses Prisma `db push` for this early
-stage; before production rollout, replace it with reviewed Prisma migrations.
+`ADMIN_API_TOKEN`, and `APILAYER_API_KEY` as API service variables.
+Deploy the web service separately with root directory `apps/web`, and set
+`ESENDER_API_URL` to the public API service URL. Before production rollout,
+replace the early-stage Prisma `db push` workflow with reviewed Prisma migrations.
 
 ### Preserved product requirements
 
 - Selected group/campaign sending coordinated across multiple iPhones.
 - Each iPhone sends through its own SIM/eSIM using iOS Shortcuts.
 - Batch sending with confirmation before each batch.
-- Per-number validation followed immediately by sending when valid.
-- Duplicate removal and opt-out exclusions, including STOP handling.
-- Message variants from `Message.txt`, separated by `==`, with rotation.
+- Per-number validation immediately before eligibility.
+- Duplicate removal and global opt-out exclusions, including STOP handling.
+- Message variants separated by `==`, with rotation to be implemented in the
+  device delivery stage.
 - Leads from `Leads.txt` or manual paste, in international format.
-- Per-device heartbeat, command polling, campaign assignment and reports.
-- Only message recipients with documented consent.
+- Per-device heartbeat, campaign assignment and reports.
 
-iOS does not guarantee always-on background execution. Devices check in when
-their Shortcut runs; a stop command cannot cancel a message already handed to iOS.
-
-
-### Stage 2 — Next.js admin dashboard
-
-A responsive Next.js + TypeScript dashboard lives in `apps/web`.
-It currently provides admin-token sign-in (kept in page memory, not browser storage),
-registered-device counts, online/active/revoked status, automatic 30-second refresh,
-and device revocation. The dashboard calls server-side Next.js route handlers, which
-proxy requests to the NestJS API; set `ESENDER_API_URL` on the web service.
-
-For local development, run `npm install`, start the API with `npm run dev`,
-then start the dashboard with `npm run dev --workspace @esender/web`.
-The dashboard is available at `http://localhost:3001`. For a separate Railway web
-service, set its root directory to `apps/web`, build with `npm install && npm run build`,
-start with `npm run start`, and set `ESENDER_API_URL` to the public API service URL.
-The API service continues to use the root `railway.toml` configuration.
-
-Campaign authoring, batch confirmation, command delivery and report screens are not
-implemented yet; they remain planned stages. The navigation labels for those areas are
-visual placeholders, not active features.
+Only message recipients with documented consent. iOS does not guarantee
+always-on background execution. Devices check in when their Shortcut runs;
+a stop command cannot cancel a message already handed to iOS.
