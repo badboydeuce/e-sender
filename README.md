@@ -72,3 +72,23 @@ stage; before production rollout, replace it with reviewed Prisma migrations.
 
 iOS does not guarantee always-on background execution. Devices check in when
 their Shortcut runs; a stop command cannot cancel a message already handed to iOS.
+
+
+### Stage 2 — Next.js admin dashboard
+
+A responsive Next.js + TypeScript dashboard lives in `apps/web`.
+It currently provides admin-token sign-in (kept in page memory, not browser storage),
+registered-device counts, online/active/revoked status, automatic 30-second refresh,
+and device revocation. The dashboard calls server-side Next.js route handlers, which
+proxy requests to the NestJS API; set `ESENDER_API_URL` on the web service.
+
+For local development, run `npm install`, start the API with `npm run dev`,
+then start the dashboard with `npm run dev --workspace @esender/web`.
+The dashboard is available at `http://localhost:3001`. For a separate Railway web
+service, set its root directory to `apps/web`, build with `npm install && npm run build`,
+start with `npm run start`, and set `ESENDER_API_URL` to the public API service URL.
+The API service continues to use the root `railway.toml` configuration.
+
+Campaign authoring, batch confirmation, command delivery and report screens are not
+implemented yet; they remain planned stages. The navigation labels for those areas are
+visual placeholders, not active features.
