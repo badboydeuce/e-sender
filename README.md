@@ -92,3 +92,13 @@ Shortcuts check in when run; iOS does not guarantee continuous background work.
 - Admin endpoints live under `/api/admin/auto-reply` and require the admin bearer token.
 
 The API does not receive SMS directly from the mobile network and does not send SMS. Stage 4.2 must configure the iOS Message automation to forward incoming-message details to this API and send a returned reply using the iPhone's own SIM/eSIM. iOS automation execution is not guaranteed to be continuously available. A reported `SENT` means the iOS send action succeeded, not that carrier delivery was confirmed.
+
+## Stage 4.2 iPhone auto-reply Shortcut
+
+- Follow [the iOS Shortcut integration guide](docs/ios-auto-reply-shortcut.md) to create a Personal Automation triggered by an incoming Message.
+- The Shortcut forwards the incoming sender (E.164), message text, and a generated UUID to `POST /api/device/incoming-message` using its enrolled device token.
+- It sends only a non-empty reply returned by the API, to the original sender, using the iPhone's own Messages/SIM configuration.
+- It then reports `SENT` or `FAILED` to `POST /api/device/auto-reply/:eventId/report`.
+- A machine-readable integration outline is in `docs/ios-auto-reply-shortcut.manifest.json`.
+- iOS may require user confirmation or limit automation execution. The guide requires testing the actual device/iOS version; the server cannot bypass iOS restrictions.
+- This stage documents and specifies the native Shortcut workflow. It does not generate or install an Apple-signed `.shortcut` file. Build the automation in the Shortcuts app using the guide.
