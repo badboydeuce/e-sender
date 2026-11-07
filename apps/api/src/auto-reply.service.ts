@@ -59,7 +59,7 @@ export class AutoReplyService {
         if(matches.length)await tx.batchRecipient.updateMany({where:{recipientId:{in:matches.map(x=>x.id)},status:"QUEUED"},data:{status:"SKIPPED",error:"Recipient opted out by incoming STOP message"}});
         await tx.autoReplyEvent.create({data:{deviceId:device.id,externalMessageId:messageId,phone,incomingText:body,status:"SUPPRESSED"}});
       });
-      return{event_id:null,reply:null,status:"SUPPRESSED",opted_out:true};
+      return{event_id:(await this.prisma.autoReplyEvent.findUnique({where:{deviceId_externalMessageId:{deviceId:device.id,externalMessageId:messageId}}}))?.id??null,reply:null,status:"SUPPRESSED",opted_out:true};
     }
     const event=await this.prisma.autoReplyEvent.create({data:{deviceId:device.id,externalMessageId:messageId,phone,incomingText:body,status:"RECEIVED"}});
     const [global,deviceSettings,suppressed]=await Promise.all([
