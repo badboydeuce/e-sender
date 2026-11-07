@@ -19,7 +19,7 @@ export class SendingService {
   const messages=campaign.messageSet.split(/\r?\n==\r?\n/).map(v=>v.trim()).filter(Boolean);
   if(!messages.length)throw new BadRequestException("Campaign has no usable message variants");
   const previousCount=await this.prisma.batchRecipient.count({where:{batch:{campaignId}}});
-  const batch=await this.prisma.campaignBatch.create({data:{campaignId,deviceId,status:"PENDING_APPROVAL",recipients:{create:rows.map((r,i)=>({recipientId:r.id,message:messages[(previousCount+i)%messages.length]}))},include:{recipients:{include:{recipient:{select:{phone:true}}}}}});
+  const batch=await this.prisma.campaignBatch.create({data:{campaignId,deviceId,status:"PENDING_APPROVAL",recipients:{create:rows.map((r,i)=>({recipientId:r.id,message:messages[(previousCount+i)%messages.length]}))}},include:{recipients:{include:{recipient:{select:{phone:true}}}}}});
   return {batch_id:batch.id,campaign_id:campaignId,device_id:deviceId,status:batch.status,recipient_count:batch.recipients.length,recipients:batch.recipients.map(r=>({item_id:r.id,phone:r.recipient.phone,message:r.message})),requires_approval:true};
  }
  async approveBatch(id:string){
