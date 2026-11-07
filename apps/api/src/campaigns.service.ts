@@ -29,5 +29,15 @@ export class CampaignsService {
   return{campaign_id:id,processed:results.length,eligible:results.filter(r=>r.status==="ELIGIBLE").length,results};
  }
  async recipients(id:string){await this.detail(id);return this.prisma.campaignRecipient.findMany({where:{campaignId:id},orderBy:{createdAt:"asc"}});}
- async stopRecipient(phoneInput:string){const phone=phoneInput.trim();if(!/^\+[1-9]\d{7,14}$/.test(phone))throw new BadRequestException("Phone number must be in E.164 format");await this.prisma.suppression.upsert({where:{phone},create:{phone,reason:"STOP"},update:{reason:"STOP"}});const matches=await this.prisma.campaignRecipient.findMany({where:{phone},select:{id:true}});await this.prisma.campaignRecipient.updateMany({where:{phone},data:{status:"OPTED_OUT"}});if(matches.length)await this.prisma.batchRecipient.updateMany({where:{recipientId:{in:matches.map(r=>r.id)},status:"QUEUED"},data:{status:"SKIPPED",error:"Recipient opted out"}});return{phone,opted_out:true};}
+ async stopRecipient(phoneInput:string){
+  const phone=phoneInput.trim();
+  if(!/^\+[1-9]\d{7,14}$/.test(phone))throw new BadRequestException("Phone number must be in E.164 format");
+  return this.prisma.$transaction(async tx=>{
+   await tx.suppression.upsert({where:{phone},create:{phone,reason:"STOP"},update:{reason:"STOP"}});
+   const matches=await tx.campaignRecipient.findMany({where:{phone},select:{id:true}});
+   await tx.campaignRecipient.updateMany({where:{phone},data:{status:"OPTED_OUT"}});
+   if(matches.length)await tx.batchRecipient.updateMany({where:{recipientId:{in:matches.map(r=>r.id)},status:"QUEUED"},data:{status:"SKIPPED",error:"Recipient opted out"}});
+   return {phone,opted_out:true};
+  });
+ }
 }
