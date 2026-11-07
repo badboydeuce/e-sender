@@ -58,3 +58,39 @@ for (const campaignStatus of ["PAUSED", "STOPPED"]) {
     assert.deepEqual(recipientUpdates[0].where.status, { not: "OPTED_OUT" });
   });
 }
+
+test("approval cancels a batch when every recipient became ineligible", async () => {
+  const batchUpdates = [];
+  let campaignActivated = false;
+  const tx = {
+    $queryRawUnsafe: async () => [],
+    campaignBatch: {
+      findUnique: async () => ({ id: "batch", campaignId: "campaign", status: "PENDING_APPROVAL", campaign: { status: "DRAFT" }, device: { active: true } }),
+      update: async ({ data }) => { batchUpdates.push(data); return {}; },
+    },
+    suppression: { findMany: async () => [{ phone: "+14155550123" }] },
+    batchRecipient: {
+      findMany: async () => [{ id: "item", recipientId: "recipient", status: "QUEUED", recipient: { phone: "+14155550123", consented: true, status: "OPTED_OUT" } }],
+      updateMany: async () => ({ count: 1 }),
+    },
+    campaignRecipient: { updateMany: async () => ({ count: 0 }) },
+    campaign: { update: async () => { campaignActivated = true; } },
+  };
+  const service = new SendingService({ $transaction: callback => callback(tx) }, {});
+  const result = await service.approveBatch("batch");
+  assert.equal(result.status, "CANCELLED");
+  assert.equal(result.approved_recipients, 0);
+  assert.equal(batchUpdates[0].status, "CANCELLED");
+  assert.equal(campaignActivated, false);
+});
+
+test("cancellation refuses a batch that has already been approved", async () => {
+  const tx = {
+    $queryRawUnsafe: async () => [],
+    campaignBatch: {
+      findUnique: async () => ({ id: "batch", campaignId: "campaign", status: "APPROVED" }),
+    },
+  };
+  const service = new SendingService({ $transaction: callback => callback(tx) }, {});
+  await assert.rejects(() => service.cancelBatch("batch"), /Only a batch awaiting approval can be cancelled/);
+});
