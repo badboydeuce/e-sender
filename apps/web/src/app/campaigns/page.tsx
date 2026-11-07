@@ -1,5 +1,5 @@
 "use client";
-import { useCallback,useEffect,useState } from "react";
+import { useCallback,useEffect,useState, type CSSProperties } from "react";
 type Campaign={id:string;name:string;status:string;batchSize:number;createdAt:string;_count:{recipients:number;devices:number}};
 export default function CampaignsPage(){
  const [token,setToken]=useState("");const [campaigns,setCampaigns]=useState<Campaign[]>([]);
@@ -21,5 +21,5 @@ export default function CampaignsPage(){
  <section style={{background:"#151d2b",padding:20,borderRadius:14}}><h2>Campaign list</h2>{campaigns.map(c=><div key={c.id} style={{padding:"14px 0",borderBottom:"1px solid #2a3548",display:"flex",gap:14,alignItems:"center",flexWrap:"wrap"}}><div style={{flex:1}}><strong>{c.name}</strong><div style={{color:"#9aa7bd",fontSize:13}}>{c.status} · {c._count.recipients} recipients · {c._count.devices} devices · batch {c.batchSize}</div></div><button style={btn} disabled={busy} onClick={()=>setSelected(c.id)}>Import leads</button>{c.status!=="PAUSED"&&c.status!=="STOPPED"?<button style={btn} disabled={busy} onClick={()=>void status(c.id,"PAUSED")}>Pause</button>:c.status==="PAUSED"?<button style={btn} disabled={busy} onClick={()=>void status(c.id,"DRAFT")}>Resume as draft</button>:null}<button style={{...btn,background:"#633b42"}} disabled={busy||c.status==="STOPPED"} onClick={()=>void status(c.id,"STOPPED")}>Stop</button></div>)}{campaigns.length===0&&<p style={{color:"#9aa7bd"}}>No campaigns yet.</p>}</section>
  </main>;
 }
-const field:React.CSSProperties={boxSizing:"border-box",width:"100%",padding:12,borderRadius:8,border:"1px solid #34425a",background:"#0d1420",color:"#eef3ff"};
+const field:CSSProperties={boxSizing:"border-box",width:"100%",padding:12,borderRadius:8,border:"1px solid #34425a",background:"#0d1420",color:"#eef3ff"};
 const btn:React.CSSProperties={padding:"10px 15px",border:0,borderRadius:8,background:"#596ee8",color:"white",marginTop:12,cursor:"pointer"};
