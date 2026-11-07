@@ -41,13 +41,29 @@ export class SendingService {
    const items=await tx.batchRecipient.findMany({where:{batchId:id,status:"QUEUED"},include:{recipient:true}});
    const allowed=items.filter(i=>i.recipient.consented&&i.recipient.status==="ELIGIBLE"&&!blocked.some(s=>s.phone===i.recipient.phone));
    await tx.batchRecipient.updateMany({where:{batchId:id,status:"QUEUED",id:{notIn:allowed.map(i=>i.id)}},data:{status:"SKIPPED",error:"Consent, eligibility or suppression check failed"}});
-   if(allowed.length)await tx.campaignRecipient.updateMany({where:{id:{in:allowed.map(i=>i.recipientId)},status:"ELIGIBLE"},data:{status:"QUEUED"}});
+   if(!allowed.length){
+    await tx.campaignBatch.update({where:{id},data:{status:"CANCELLED",completedAt:new Date()}});
+    return {batch_id:id,status:"CANCELLED",approved_recipients:0,skipped:items.length};
+   }
+   await tx.campaignRecipient.updateMany({where:{id:{in:allowed.map(i=>i.recipientId)},status:"ELIGIBLE"},data:{status:"QUEUED"}});
    await tx.campaignBatch.update({where:{id},data:{status:"APPROVED",approvedAt:new Date()}});
    await tx.campaign.update({where:{id:batch.campaignId},data:{status:"ACTIVE"}});
    return {batch_id:id,status:"APPROVED",approved_recipients:allowed.length,skipped:items.length-allowed.length};
   });
  }
- async cancelBatch(id:string){const b=await this.prisma.campaignBatch.findUnique({where:{id}});if(!b)throw new NotFoundException("Batch not found");if(["IN_PROGRESS","COMPLETED"].includes(b.status))throw new BadRequestException("A batch already handed to a device cannot be cancelled as pending");await this.prisma.batchRecipient.updateMany({where:{batchId:id,status:"QUEUED"},data:{status:"SKIPPED",error:"Batch cancelled by administrator"}});return this.prisma.campaignBatch.update({where:{id},data:{status:"CANCELLED"}});}
+ async cancelBatch(id:string){
+  return this.prisma.$transaction(async tx=>{
+   const initial=await tx.campaignBatch.findUnique({where:{id},select:{campaignId:true}});
+   if(!initial)throw new NotFoundException("Batch not found");
+   await tx.$queryRawUnsafe<Array<{id:string}>>('SELECT "id" FROM "Campaign" WHERE "id" = $1 FOR UPDATE',initial.campaignId);
+   await tx.$queryRawUnsafe<Array<{id:string}>>('SELECT "id" FROM "CampaignBatch" WHERE "id" = $1 FOR UPDATE',id);
+   const batch=await tx.campaignBatch.findUnique({where:{id}});
+   if(!batch)throw new NotFoundException("Batch not found");
+   if(batch.status!=="PENDING_APPROVAL")throw new BadRequestException("Only a batch awaiting approval can be cancelled");
+   await tx.batchRecipient.updateMany({where:{batchId:id,status:"QUEUED"},data:{status:"SKIPPED",error:"Batch cancelled by administrator"}});
+   return tx.campaignBatch.update({where:{id},data:{status:"CANCELLED",completedAt:new Date()}});
+  });
+ }
  async poll(token:string){
   const device=await this.prisma.device.findUnique({where:{tokenHash:tokenDigest(token)}});
   if(!device||!device.active)throw new UnauthorizedException("Invalid or revoked device token");
