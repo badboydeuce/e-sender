@@ -6,8 +6,10 @@
     "apps/*"
   ],
   "scripts": {
-    "build": "npm run build --workspace @esender/api",
+    "build": "npm run build --workspace @esender/api && npm run build --workspace @esender/web",
     "dev": "npm run start:dev --workspace @esender/api",
-    "typecheck": "npm run typecheck --workspace @esender/api"
+    "typecheck": "npm run typecheck --workspace @esender/api && npm run typecheck --workspace @esender/web",
+    "build:api": "npm run build --workspace @esender/api",
+    "build:web": "npm run build --workspace @esender/web"
   }
 }
